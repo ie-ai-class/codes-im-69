@@ -4,7 +4,7 @@ __generated_with = "0.25.2"
 app = marimo.App()
 
 
-@app.cell(hide_code=True)
+@app.cell
 def _():
     import marimo as mo
     import matplotlib.pyplot as plt
@@ -20,7 +20,7 @@ def _():
     return b_slider, mo, np, plt, sns, w_slider, x_data, y_data
 
 
-@app.cell(hide_code=True)
+@app.cell
 def _(b_slider, mo, np, plt, sns, w_slider, x_data, y_data):
     w = w_slider.value
     b = b_slider.value
@@ -50,7 +50,7 @@ def _(b_slider, mo, np, plt, sns, w_slider, x_data, y_data):
     return
 
 
-@app.cell(hide_code=True)
+@app.cell
 def _(b_slider, mo, np, w_slider, x_data, y_data):
     import plotly.graph_objects as go
 
