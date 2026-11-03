@@ -4,7 +4,7 @@ __generated_with = "0.25.2"
 app = marimo.App()
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _():
     import marimo as mo
     import matplotlib.pyplot as plt
@@ -18,7 +18,7 @@ def _():
     return b_slider, mo, np, plt, sns, w_slider, x_data, y_data
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(b_slider, mo, np, plt, sns, w_slider, x_data, y_data):
     w = w_slider.value
     b = b_slider.value
@@ -28,9 +28,7 @@ def _(b_slider, mo, np, plt, sns, w_slider, x_data, y_data):
     sns.set_theme(style="whitegrid", context="notebook")
     fig, ax = plt.subplots()
     ax.set_title(f"Linear model | MSE = {mse:.3f}")
-    sns.scatterplot(
-        x=x_data, y=y_data, color="tab:orange", label="Data", s=80, ax=ax
-    )
+    sns.scatterplot(x=x_data, y=y_data, color="tab:orange", label="Data", s=80, ax=ax)
     sns.lineplot(
         x=x_line,
         y=y_line,
@@ -48,6 +46,44 @@ def _(b_slider, mo, np, plt, sns, w_slider, x_data, y_data):
 
     output = mo.vstack([mo.hstack([w_slider, b_slider]), fig])
     output
+    return
+
+
+@app.cell(hide_code=True)
+def _(b_slider, mo, np, w_slider, x_data, y_data):
+    import plotly.graph_objects as go
+
+    w_grid = np.linspace(-2, 3, 101)
+    b_grid = np.linspace(-2, 5, 101)
+    W, B = np.meshgrid(w_grid, b_grid)
+    residuals = y_data[None, None, :] - (
+        W[:, :, None] * x_data[None, None, :] + B[:, :, None]
+    )
+    mse_surface = np.mean(residuals**2, axis=2)
+
+    cur_w = w_slider.value
+    cur_b = b_slider.value
+    cur_mse = np.mean((y_data - (cur_w * x_data + cur_b)) ** 2)
+
+    surface_fig = go.Figure(
+        data=[
+            go.Surface(x=w_grid, y=b_grid, z=mse_surface, colorscale="Viridis"),
+            go.Scatter3d(
+                x=[cur_w],
+                y=[cur_b],
+                z=[cur_mse],
+                mode="markers",
+                marker=dict(size=6, color="red"),
+                name="Current (w, b)",
+            ),
+        ]
+    )
+    surface_fig.update_layout(
+        title="MSE surface over w and b",
+        scene=dict(xaxis_title="w", yaxis_title="b", zaxis_title="MSE"),
+        height=600,
+    )
+    mo.ui.plotly(surface_fig)
     return
 
 
