@@ -1,0 +1,19 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# marimo Notebook Patterns
+# Ignore local runtime session states and caching
+**/__marimo__/session/
+**/__marimo__/cache/
+
+# Ignore internal LSP and static web assets generated during execution
+marimo/_static/
+marimo/_lsp/
