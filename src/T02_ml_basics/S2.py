@@ -232,7 +232,9 @@ def _(b_slider, mo, np, plt, w_slider, x, y):
     _fig, _ax = plt.subplots(figsize=(7, 4.5))
     _ax.scatter(x, y, s=100, color="black", zorder=3)
     _ax.plot(_xg, _pg, label=f"y = σ({_w:.2f}x + ({_b:.2f}))")
-    _ax.vlines(x, y, _p_data, color="red", ls=":", lw=1)  # gap between label and prediction
+    _ax.vlines(
+        x, y, _p_data, color="red", ls=":", lw=1
+    )  # gap between label and prediction
     _ax.axhline(0.5, color="gray", ls="--", lw=1)
     _ax.set_xlabel("x")
     _ax.set_ylabel("y")
@@ -267,6 +269,142 @@ def _(b_slider, mo, np, plt, w_slider, x, y):
     )
 
     mo.vstack([w_slider, b_slider, _fig, _surf])
+    return (go,)
+
+
+@app.cell
+def _(np, plt):
+    # --- 2D data: two overlapping Gaussian blobs ---
+    _rng = np.random.default_rng(0)
+    n_2d = 30
+    X0_2d = _rng.normal(loc=[2.0, 2.0], scale=1.0, size=(n_2d, 2))  # class 0
+    X1_2d = _rng.normal(loc=[4.5, 4.5], scale=1.0, size=(n_2d, 2))  # class 1
+    _X = np.vstack([X0_2d, X1_2d])
+    _y = np.r_[np.zeros(n_2d), np.ones(n_2d)]
+
+    # --- Fit logistic regression with plain gradient descent on BCE ---
+    _w = np.zeros(2)
+    b_2d = 0.0
+    for _ in range(5000):
+        _p = 1 / (1 + np.exp(-(_X @ _w + b_2d)))
+        _w -= 0.1 * (_X.T @ (_p - _y)) / len(_y)
+        b_2d -= 0.1 * (_p - _y).mean()
+    w1_2d, w2_2d = _w
+
+    # --- Textbook view: scatter + straight decision boundary ---
+    _x1 = np.linspace(-1, 7.5, 100)
+    _x2 = -(w1_2d * _x1 + b_2d) / w2_2d  # w1·x1 + w2·x2 + b = 0
+
+    _fig, _ax = plt.subplots(figsize=(6, 6))
+    _ax.scatter(
+        X0_2d[:, 0],
+        X0_2d[:, 1],
+        color="tab:blue",
+        edgecolor="k",
+        label="class 0 (y = 0)",
+    )
+    _ax.scatter(
+        X1_2d[:, 0],
+        X1_2d[:, 1],
+        color="tab:red",
+        marker="^",
+        edgecolor="k",
+        label="class 1 (y = 1)",
+    )
+    _ax.plot(_x1, _x2, "k-", lw=2, label="decision boundary (p = 0.5)")
+    _ax.set_xlim(-1, 7.5)
+    _ax.set_ylim(-1, 7.5)
+    _ax.set_aspect("equal")
+    _ax.set_xlabel("$x_1$")
+    _ax.set_ylabel("$x_2$")
+    _ax.set_title(f"${w1_2d:.2f}x_1 + {w2_2d:.2f}x_2 + ({b_2d:.2f}) = 0$")
+    _ax.legend(loc="upper left")
+    _fig
+    return X0_2d, X1_2d, b_2d, n_2d, w1_2d, w2_2d
+
+
+@app.cell
+def _(X0_2d, X1_2d, b_2d, go, mo, n_2d, np, w1_2d, w2_2d):
+    _X0, _X1, _n = X0_2d, X1_2d, n_2d
+    _w1, _w2, _b = w1_2d, w2_2d, b_2d
+
+    # --- Probability surface p = σ(w1·x1 + w2·x2 + b) ---
+    _g = np.linspace(-1, 7.5, 80)
+    _G1, _G2 = np.meshgrid(_g, _g)
+    _P = 1 / (1 + np.exp(-(_w1 * _G1 + _w2 * _G2 + _b)))
+
+    # Decision boundary: w1·x1 + w2·x2 + b = 0  →  x2 = −(w1·x1 + b) / w2
+    _bx1 = _g
+    _bx2 = -(_w1 * _bx1 + _b) / _w2
+    _keep = (_bx2 >= _g[0]) & (_bx2 <= _g[-1])
+    _bx1, _bx2 = _bx1[_keep], _bx2[_keep]
+
+    _fig2d = go.Figure(
+        data=[
+            go.Surface(
+                x=_G1,
+                y=_G2,
+                z=_P,
+                colorscale="RdBu_r",
+                cmin=0,
+                cmax=1,
+                opacity=0.8,
+                # colorbar=dict(title="p(y=1)"),
+                showscale=False
+            ),
+            # Data points sit at their label height: z = 0 or z = 1
+            go.Scatter3d(
+                x=_X0[:, 0],
+                y=_X0[:, 1],
+                z=np.zeros(_n),
+                mode="markers",
+                marker=dict(size=4, color="blue"),
+                name="class 0",
+            ),
+            go.Scatter3d(
+                x=_X1[:, 0],
+                y=_X1[:, 1],
+                z=np.ones(_n),
+                mode="markers",
+                marker=dict(size=4, color="red"),
+                name="class 1",
+            ),
+            # Boundary on the surface (p = 0.5) and projected onto the floor (p = 0)
+            go.Scatter3d(
+                x=_bx1,
+                y=_bx2,
+                z=np.full_like(_bx1, 0.5),
+                mode="lines",
+                line=dict(color="black", width=6),
+                name="p = 0.5 on surface",
+            ),
+            go.Scatter3d(
+                x=_bx1,
+                y=_bx2,
+                z=np.zeros_like(_bx1),
+                mode="lines",
+                line=dict(color="black", width=6, dash="dash"),
+                name="decision boundary (floor)",
+            ),
+        ]
+    )
+    _fig2d.update_layout(
+        title=(f"p = σ({_w1:.2f}·x₁ + {_w2:.2f}·x₂ + ({_b:.2f}))"),
+        scene=dict(xaxis_title="x₁", yaxis_title="x₂", zaxis_title="p(y = 1)"),
+        width=800,
+        height=650,
+    )
+
+    mo.vstack(
+        [
+            mo.md(
+                f"Fitted: $w_1 = {_w1:.2f}$, $w_2 = {_w2:.2f}$, $b = {_b:.2f}$. "
+                "The decision boundary is the straight line where "
+                "$w_1 x_1 + w_2 x_2 + b = 0$, i.e. $p = 0.5$."
+            ),
+            _fig2d,
+        ]
+    )
     return
 
 
