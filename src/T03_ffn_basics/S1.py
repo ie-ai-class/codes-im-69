@@ -362,7 +362,14 @@ def _(go, mo, np):
         ),
         height=550,
     )
+    print(f"Weights: {_w[0]:.3f}, {_w[1]:.3f}, Bias: {_b:.3f}")
     mo.ui.plotly(_h_fig)
+
+    return
+
+
+@app.cell
+def _():
     return
 
 
