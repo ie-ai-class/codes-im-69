@@ -29,9 +29,9 @@ from torch import nn
 #
 # Widening the hidden layer (e.g. 2 -> 4 neurons) makes these traps much rarer.
 
-# torch.manual_seed(1)
+torch.manual_seed(1)
 # torch.manual_seed(10)
-torch.manual_seed(40)
+# torch.manual_seed(40)
 
 # ── 1. Data ────────────────────────────────────────────────────────────────
 # All four possible inputs and their XOR labels:
@@ -50,6 +50,10 @@ model = nn.Sequential(
     nn.Sigmoid(),  # non-linearity (without it, the model is just linear)
     nn.Linear(2, 1),  # output layer: 2 neurons -> 1 logit
 )
+
+# Count the number of parameters
+pytorch_total_params = sum(p.numel() for p in model.parameters())
+print(f"Total number of parameters in the model: {pytorch_total_params}")
 
 # ── 3. Train ───────────────────────────────────────────────────────────────
 # BCEWithLogitsLoss = Sigmoid + BCELoss combined into one step.

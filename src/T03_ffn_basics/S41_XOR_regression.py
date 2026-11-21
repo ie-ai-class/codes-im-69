@@ -46,6 +46,10 @@ model = nn.Sequential(
     nn.Linear(2, 1),  # output layer: 2 neurons -> 1 real-valued prediction
 )
 
+# Count the number of parameters
+pytorch_total_params = sum(p.numel() for p in model.parameters())
+print(f"Total number of parameters in the model: {pytorch_total_params}")
+
 # ── 3. Train ───────────────────────────────────────────────────────────────
 # MSELoss = mean of (prediction - target)^2 over all samples.
 #   - Input : raw model outputs (any real number)
