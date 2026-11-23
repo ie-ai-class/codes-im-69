@@ -17,3 +17,5 @@ wheels/
 # Ignore internal LSP and static web assets generated during execution
 marimo/_static/
 marimo/_lsp/
+
+_data/
