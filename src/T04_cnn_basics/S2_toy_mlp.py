@@ -1,16 +1,20 @@
 """
-A toy CNN: telling vertical lines from horizontal lines.
+A toy MLP: telling vertical lines from horizontal lines.
 
-Each image is a tiny 8x8 grayscale picture that contains ONE bright line,
-either vertical (label 0) or horizontal (label 1), at a random position,
-plus some random noise.
+Same data as S1_toy_cnn.py: each image is a tiny 8x8 grayscale picture that
+contains ONE bright line, either vertical (label 0) or horizontal (label 1),
+at a random position, plus some random noise.
 
-Why a CNN?
-  - A convolution filter is a small window (here 3x3) that slides over the
-    whole image. The SAME weights are used at every position, so a filter
-    that learns "vertical edge" detects it wherever the line is.
-  - Max pooling keeps the strongest response in each region, so the exact
-    position of the line matters less.
+This time we use a plain MLP (fully connected network) instead of a CNN.
+
+Why does an MLP need more parameters?
+  - The MLP first flattens the 8x8 image into 64 numbers, so it loses the
+    2D layout of the pixels.
+  - Every hidden neuron is connected to ALL 64 pixels, with its own weight
+    for each pixel. Nothing is shared: a pattern learned in the top-left
+    corner has to be learned again for every other position.
+  - A CNN filter has only 3x3 = 9 weights, reused at every position.
+Compare the parameter count printed below with the CNN in S1_toy_cnn.py (105).
 """
 
 import matplotlib.pyplot as plt
@@ -20,9 +24,8 @@ from torch import nn
 torch.manual_seed(0)
 
 # ── 1. Data ────────────────────────────────────────────────────────────────
-# Generate N images of size 8x8.
-# PyTorch expects image tensors with shape (batch, channels, height, width).
-# Grayscale images have 1 channel, so X has shape (N, 1, 8, 8).
+# Exactly the same data as S1_toy_cnn.py.
+# X has shape (N, 1, 8, 8): (batch, channels, height, width).
 N = 200
 SIZE = 8
 
@@ -47,12 +50,6 @@ X_test, y_test = make_data(50)  # fresh images the model never sees in training
 
 print(f"X_train shape: {tuple(X_train.shape)}  (batch, channels, height, width)")
 
-# Look at one example of each class (rounded so it is easy to read)
-print("\nExample vertical line (label 0):")
-print(X_train[0, 0].round(decimals=1))
-print("\nExample horizontal line (label 1):")
-print(X_train[1, 0].round(decimals=1))
-
 # Plot the first 8 training images as pictures
 fig, axes = plt.subplots(2, 4, figsize=(8, 4))
 for i, ax in enumerate(axes.flat):
@@ -65,24 +62,24 @@ plt.show()
 
 # ── 2. Model ───────────────────────────────────────────────────────────────
 # Shape of one image as it flows through the model:
-#   (1, 8, 8) --Conv2d--> (4, 8, 8) --MaxPool2d--> (4, 4, 4) --Flatten--> (64,)
-#             --Linear--> (1,)  one logit
+#   (1, 8, 8) --Flatten--> (64,) --Linear--> (32,) --Linear--> (1,)  one logit
+HIDDEN = 32
 model = nn.Sequential(
-    nn.Conv2d(1, 4, kernel_size=3, padding=1),  # 1 input channel -> 4 filters
+    nn.Flatten(),  # (1, 8, 8) -> 64 numbers: the 2D layout is gone
+    nn.Linear(SIZE * SIZE, HIDDEN),  # every hidden neuron sees all 64 pixels
     nn.ReLU(),  # non-linearity
-    nn.MaxPool2d(2),  # halve height and width: 8x8 -> 4x4
-    nn.Flatten(),  # (4, 4, 4) -> 64 numbers
-    nn.Linear(4 * 4 * 4, 1),  # 64 features -> 1 logit
+    nn.Linear(HIDDEN, 1),  # 32 features -> 1 logit
 )
 
 # Count the number of parameters
-#   Conv2d : 4 filters * (3*3 weights) + 4 biases = 40
-#   Linear : 64 weights + 1 bias                  = 65
+#   Linear 1 : 64 * 32 weights + 32 biases = 2080
+#   Linear 2 : 32 weights + 1 bias         =   33
 pytorch_total_params = sum(p.numel() for p in model.parameters())
 print(f"\nTotal number of parameters in the model: {pytorch_total_params}")
+print("(The CNN in S1_toy_cnn.py uses only 105 parameters.)")
 
 # ── 3. Train ───────────────────────────────────────────────────────────────
-# Same recipe as the XOR classification: logits + BCEWithLogitsLoss.
+# Same recipe as the CNN: logits + BCEWithLogitsLoss.
 loss_fn = nn.BCEWithLogitsLoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
 
@@ -111,12 +108,20 @@ print(f"First 10 predictions: {preds[:10].squeeze().tolist()}")
 print(f"First 10 true labels: {y_test[:10].squeeze().tolist()}")
 
 # ── 5. Peek inside ─────────────────────────────────────────────────────────
-# Each 3x3 filter is what the conv layer learned to look for.
-# Some should look like vertical or horizontal stripes.
-conv = model[0]  # layers in a Sequential are indexed like a list: [0] is the Conv2d
-assert isinstance(conv, nn.Conv2d)  # sanity check (also tells the type checker)
-print(f"\nConv weight shape: {tuple(conv.weight.shape)}  (filters, in_channels, h, w)")
+# Each hidden neuron has one weight per pixel (64 weights).
+# Reshaping them back to 8x8 shows what each neuron looks for.
+# Compare: a CNN filter is just 3x3, while each MLP neuron is a full 8x8 image.
+fc1 = model[1]  # [0] is Flatten, [1] is the first Linear layer
+assert isinstance(fc1, nn.Linear)  # sanity check (also tells the type checker)
+print(f"\nFirst Linear weight shape: {tuple(fc1.weight.shape)}  (hidden, pixels)")
 
-print("\nLearned 3x3 filters:")
-for k, w in enumerate(conv.weight.data):
-    print(f"Filter {k}:\n{w[0].round(decimals=2)}")
+fig, axes = plt.subplots(2, 4, figsize=(10, 4.5))
+for k, ax in enumerate(axes.flat):
+    w = fc1.weight.data[k].reshape(SIZE, SIZE)  # 64 weights -> 8x8 picture
+    im = ax.imshow(w, cmap="bwr")
+    fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)  # weight value scale
+    ax.set_title(f"neuron {k}")
+    ax.axis("off")
+plt.suptitle("Weights of the first 8 hidden neurons (each is 8x8)")
+plt.tight_layout()
+plt.show()
