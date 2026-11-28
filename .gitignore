@@ -19,3 +19,5 @@ marimo/_static/
 marimo/_lsp/
 
 _data/
+
+_dataset/
